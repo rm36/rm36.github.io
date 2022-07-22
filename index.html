@@ -4,49 +4,86 @@
 <style> circle {stroke: black;} </style>
 <body onload='init()'>
 <div id="stream_graph"></div>
+<div id="stream_graph_fraction"></div>
 <script>
-async function init() {
-    let margin = 30,
-        width = 500 - 2*margin;
-        height = 400 - 2*margin;
 
-    let svg = d3.select("#stream_graph")
+function getSvgWithMargins(id, width, height, margin) {
+    return d3.select(id)
         .append("svg")
             .attr("width", width + 2*margin)
             .attr("height", height + 2*margin)
         .append("g")
             .attr("transform", "translate(" + margin + "," + margin + ")");
+}
+
+function formatAxis(svg, height, x, ticks) {
+        svg.append("g")
+        .attr("transform", "translate(0," + (height*0.82) + ")")
+        .call(d3.axisBottom(x)
+            .tickSize(-height*0.82)
+            .tickValues(ticks)
+            .tickFormat(d3.format(".4")))
+        .select(".domain").remove()
+    svg.selectAll(".tick line").attr("stroke", "#bbbbbb")
+}
+
+function getFraction (data) {
+    let fraction = [];
+    for (let i = 0; i < data.length; i++) {
+        let sum = 0;
+        for (let key in data[i]) {
+            if (key != 'Year') {
+                sum += parseInt(data[i][key]);
+            }
+        }
+
+        fraction.push({});
+        for (let key in data[i]) {
+            if (key == 'Year') {
+                fraction[i][key] = parseInt(data[i][key]);
+            } else {    
+                fraction[i][key] = parseInt(data[i][key]) / sum;
+            }
+        }
+    }
+    return fraction;
+}
+
+function generateArea(x, y) {
+    return d3.area()
+    .x(function(d) { return x(d.data.Year); })
+    .y0(function(d) { return y(d[0]); })
+    .y1(function(d) { return y(d[1]); })
+}
+
+async function init() {
+    let margin = 30,
+        width = 500 - 2*margin;
+        height = 400 - 2*margin;
+
+    let svg = getSvgWithMargins("#stream_graph", width, height, margin);
+    let svgFraction = getSvgWithMargins("#stream_graph_fraction", width, height, margin);
 
     data = await d3.csv("https://rm36.github.io/degrees_conferred.csv");
+    let fraction = getFraction(data);
 
     // Get the header of the csv files
     let keys = data.columns.slice(1)
 
     let x = d3.scaleLinear()
-        .domain(d3.extent(data, function(d) { return d.Year; }))
-        .range([ 0, width ]);
+        .domain(d3.extent(data, function(d) { return d.Year; })).range([ 0, width ]);
+
     let years = [1970, 1980, 1990, 2000, 2010, 2020]
-    svg.append("g")
-        .attr("transform", "translate(0," + (height*0.82) + ")")
-        .call(d3.axisBottom(x)
-            .tickSize(-height*0.82)
-            .tickValues(years)
-            .tickFormat(d3.format(".4")))
-        .select(".domain").remove()
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb")
+    formatAxis(svg, height, x, years);
+    formatAxis(svgFraction, height, x, years);
 
-    let y = d3.scaleLinear()
-        .domain([-1500000, 1000000])
-        .range([ height, 0 ]);
+    let y = d3.scaleLinear().domain([-1000000, 1000000]).range([0, height * 0.8]);
+    let yFraction = d3.scaleLinear().domain([-0.5, 0.5]).range([0, height * 0.8]);
 
-    let color = d3.scaleOrdinal()
-        .domain(keys)
-        .range(d3.schemeCategory10);
+    let color = d3.scaleOrdinal().domain(keys).range(d3.schemeCategory10);
 
-    let stackedData = d3.stack()
-        .offset(d3.stackOffsetSilhouette)
-        .keys(keys)
-        (data);
+    let stackedData = d3.stack().offset(d3.stackOffsetSilhouette).keys(keys)(data);
+    let stackedDataFraction = d3.stack().offset(d3.stackOffsetSilhouette).keys(keys)(fraction);
 
     let majorText = svg
         .append("text")
@@ -113,17 +150,14 @@ async function init() {
         return (y < height/2) ? 50 : -50;
     }
 
-    function updateTooltip(x, y, major, data) {
+    function updateTooltip(tooltip, x, y, major, data) {
         let nearest = findNearest(x,data, major);
-        annotations[0].dx = getCenteredDx(x)
-        annotations[0].dy = getCenteredDy(y)
-        annotations[0].x = nearest.x - margin - 5;
-        annotations[0].y = y - margin - 7;
-        annotations[0].note.title = formatMajorAndYear(major, nearest.year);
-        annotations[0].note.label = "Enrolled: " + formatEnrolled(nearest.enrolled);
-
-        makeAnnotations.annotations(annotations);
-        makeAnnotations.update();
+        tooltip.dx = getCenteredDx(x)
+        tooltip.dy = getCenteredDy(y)
+        tooltip.x = nearest.x - margin - 5;
+        tooltip.y = y - margin - 7;
+        tooltip.note.title = formatMajorAndYear(major, nearest.year);
+        tooltip.note.label = "Enrolled: " + formatEnrolled(nearest.enrolled);
     }
 
     // Add annotation to the chart
@@ -137,21 +171,21 @@ async function init() {
         d3.select(this).style("stroke", "black").style("opacity", 1)
     }
     let mousemove = function(d,i) {
-        major = keys[i]
-        majorText.text(major)
-        updateTooltip(d3.event.x, d3.event.y, major, d)
+        major = keys[i];
+        majorText.text(major);
+        updateTooltip(annotations[0], d3.event.x, d3.event.y, major, d);
+        makeAnnotations.annotations(annotations);
+        makeAnnotations.update();
     }
     let mouseleave = function(d) {
         majorText.style("opacity", 0)
         d3.selectAll(".degreeArea").style("opacity", 1).style("stroke", "none")
     }
 
-    let area = d3.area()
-    .x(function(d) { return x(d.data.Year); })
-    .y0(function(d) { return y(d[0]); })
-    .y1(function(d) { return y(d[1]); })
+    let area = generateArea(x, y);
+    let areaFraction = generateArea(x, yFraction);
 
-    svg.selectAll("mylayers")
+    svg.selectAll("layerData")
         .data(stackedData)
         .enter()
         .append("path")
@@ -162,14 +196,29 @@ async function init() {
         .on("mousemove", mousemove)
         .on("mouseleave", mouseleave)
 
-    // Year label
+    svgFraction.selectAll("layerData")
+        .data(stackedDataFraction)
+        .enter()
+        .append("path")
+            .attr("class", "degreeArea")
+        .style("fill", function(d) { return color(d.key); })
+            .attr("d", areaFraction)
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemove)
+        .on("mouseleave", mouseleave)
+
+    // Year labels
     svg.append("text")
         .attr("text-anchor", "end")
         .attr("x", width/2)
         .attr("y", height-30 )
-        .text("Year")
-    }
-
+        .text("Year");
+    svgFraction.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", height-30 )
+        .text("Year");
+}
 
 </script>
 </body>
