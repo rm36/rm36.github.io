@@ -1,38 +1,176 @@
 <html>
 <script src='https://d3js.org/d3.v5.min.js'></script>
+<script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
 <style> circle {stroke: black;} </style>
 <body onload='init()'>
-<svg width=300 height=300>
-</svg>
+<div id="stream_graph"></div>
 <script>
 async function init() {
-    data = await d3.csv('https://rm36.github.io/cars2017.csv');
-    var height = 200;
-    var width = 200;
+    let margin = 30,
+        width = 500 - 2*margin;
+        height = 400 - 2*margin;
 
-    var x = d3.scaleLog().base(10).domain([10, 150]).range([0,width]);
-    var y = d3.scaleLog().base(10).domain([10, 150]).range([height, 0]);
-    var color = d3.scaleLinear().domain([0,6,12]).range(['#8888FF', 'purple', 'pink'])
-    var margin = 50;
+    let svg = d3.select("#stream_graph")
+        .append("svg")
+            .attr("width", width + 2*margin)
+            .attr("height", height + 2*margin)
+        .append("g")
+            .attr("transform", "translate(" + margin + "," + margin + ")");
 
-    var svg = d3.select('svg')
-                .attr('width', width+2*margin)
-                .attr('height', height+2*margin)
+    data = await d3.csv("https://rm36.github.io/degrees_conferred.csv");
 
-    svg.append('g').attr('transform', 'translate('+margin+','+margin+')')
-       .selectAll('circle').data(data).enter().append('circle')
-       .attr('cx', function(d,i) { return x(parseInt(d.AverageCityMPG)); })
-       .attr('cy', function(d,i) { return y(parseInt(d.AverageHighwayMPG)); })  
-       .attr('r', function(d,i) { return parseInt(d.EngineCylinders) + 2; })
-       .attr('fill', function(d,i) { return color(parseInt(d.EngineCylinders)); });
+    // Get the header of the csv files
+    let keys = data.columns.slice(1)
 
-    svg.append('g').attr('transform', 'translate('+margin+','+margin+')')
-                   .call(d3.axisLeft(y).tickValues([10,20,50,100])
-                                      .tickFormat(d3.format("~s")));
-    svg.append('g').attr('transform', 'translate('+margin+','+(height+margin)+')')
-                   .call(d3.axisBottom(x).tickValues([10,20,50,100])
-                                      .tickFormat(d3.format("~s")));
+    let x = d3.scaleLinear()
+        .domain(d3.extent(data, function(d) { return d.Year; }))
+        .range([ 0, width ]);
+    let years = [1970, 1980, 1990, 2000, 2010, 2020]
+    svg.append("g")
+        .attr("transform", "translate(0," + (height*0.82) + ")")
+        .call(d3.axisBottom(x)
+            .tickSize(-height*0.82)
+            .tickValues(years)
+            .tickFormat(d3.format(".4")))
+        .select(".domain").remove()
+    svg.selectAll(".tick line").attr("stroke", "#bbbbbb")
+
+    let y = d3.scaleLinear()
+        .domain([-1500000, 1000000])
+        .range([ height, 0 ]);
+
+    let color = d3.scaleOrdinal()
+        .domain(keys)
+        .range(d3.schemeCategory10);
+
+    let stackedData = d3.stack()
+        .offset(d3.stackOffsetSilhouette)
+        .keys(keys)
+        (data);
+
+    let majorText = svg
+        .append("text")
+        .attr("x", 0)
+        .attr("y", 0)
+        .style("opacity", 0)
+        .style("font-size", 17)
+
+    const annotations = [
+      {
+        note: {
+          label: "Label",
+          title: "Title"
+        },
+        x: 50,
+        y: 50,
+        dy: 50,
+        dx: 50,
+        connector: { end: "dot" },
+        type: d3.annotationCalloutElbow,
+      }
+    ];
+
+    let yearScale = d3.scaleLinear()
+        .domain([margin, width+margin])
+        .range([years[0], years[years.length - 1]]);
+
+    function findNearest(x, data, major) {
+        exactYear = yearScale(x);
+        let closestDist = 20;
+        let closestYear = 2020;
+        let closestEnrolled = 0;
+        for (let i = 0; i < data.length; i++) {
+            year = data[i].data.Year;
+            let dist = Math.abs(exactYear - year);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestYear = year;
+                closestEnrolled = data[i].data[major];
+            }
+        }
+        return {'year': closestYear,
+                'x': yearScale.invert(closestYear),
+                'enrolled': closestEnrolled};
     }
+
+    function formatMajorAndYear(major, year) {
+        let majorStr = major;
+        let maxLength = 5;
+        if (major.length > maxLength + 3) {
+            majorStr = major.substring(0, maxLength) + "...";
+        }
+        return majorStr + " - " + year;
+    }
+
+    function formatEnrolled(enrolled) {
+        return d3.format(",.8")(enrolled);
+    }
+
+    function getCenteredDx(x) {
+        return (x < width/2) ? 50 : -50;
+    }
+    function getCenteredDy(y) {
+        return (y < height/2) ? 50 : -50;
+    }
+
+    function updateTooltip(x, y, major, data) {
+        let nearest = findNearest(x,data, major);
+        annotations[0].dx = getCenteredDx(x)
+        annotations[0].dy = getCenteredDy(y)
+        annotations[0].x = nearest.x - margin - 5;
+        annotations[0].y = y - margin - 7;
+        annotations[0].note.title = formatMajorAndYear(major, nearest.year);
+        annotations[0].note.label = "Enrolled: " + formatEnrolled(nearest.enrolled);
+
+        makeAnnotations.annotations(annotations);
+        makeAnnotations.update();
+    }
+
+    // Add annotation to the chart
+    makeAnnotations = d3.annotation().annotations(annotations)
+    svg.append("g").call(makeAnnotations)
+
+    // Reactive mouse callbacks
+    let mouseover = function(d) {
+        majorText.style("opacity", 1)
+        d3.selectAll(".degreeArea").style("opacity", 0.25)
+        d3.select(this).style("stroke", "black").style("opacity", 1)
+    }
+    let mousemove = function(d,i) {
+        major = keys[i]
+        majorText.text(major)
+        updateTooltip(d3.event.x, d3.event.y, major, d)
+    }
+    let mouseleave = function(d) {
+        majorText.style("opacity", 0)
+        d3.selectAll(".degreeArea").style("opacity", 1).style("stroke", "none")
+    }
+
+    let area = d3.area()
+    .x(function(d) { return x(d.data.Year); })
+    .y0(function(d) { return y(d[0]); })
+    .y1(function(d) { return y(d[1]); })
+
+    svg.selectAll("mylayers")
+        .data(stackedData)
+        .enter()
+        .append("path")
+            .attr("class", "degreeArea")
+        .style("fill", function(d) { return color(d.key); })
+            .attr("d", area)
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemove)
+        .on("mouseleave", mouseleave)
+
+    // Year label
+    svg.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", height-30 )
+        .text("Year")
+    }
+
+
 </script>
 </body>
 </html>
