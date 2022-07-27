@@ -1,0 +1,371 @@
+<html>
+<script src='https://d3js.org/d3.v5.min.js'></script>
+<script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
+<head>
+<style>
+/* Style taken from:  https://typespiration.com/clean-slate */
+h1 { color: #333333; font-family: 'Georgia', serif; font-size: 50px; font-weight: normal; line-height: 54px; margin: 0 0 24px; }
+p { color: #333333; font-family: Georgia, serif; font-size: 18px; line-height: 28px; margin: 0 100 28px; }
+p:first-of-type { font-size: 26px; line-height: 36px; margin: 0 0 58px; text-align: center;}
+a {
+  text-decoration: none;
+  display: inline-block;
+  padding: 8px 16px;
+  font-family: 'Georgia', serif;
+  font-size: 26px;
+}
+
+a:hover {
+  background-color: #ddd;
+  color: black;
+}
+
+.previous {
+  background-color: #f1f1f1;
+  color: black;
+}
+
+.next {
+  background-color: #046DAA;
+  color: white;
+}
+
+h1 {text-align: center;}
+circle {stroke: black;}
+.center {
+    display: flex;
+    justify-content: space-around;
+  /*margin-left: auto;
+  margin-right: auto;*/
+}
+</style>
+</head>
+<body onload='init()'>
+<h1>Degrees conferred every year in the USA</h1>
+<p>By Rodrigo Mendoza</p>
+<p> For <strong>Education</strong> majors, however, this number has been decreasing <strong>drastically!</strong></p>
+<p> And for <strong>Social sciences and history</strong>, the number has been steady over the years. This means the percentage of graduates is much lower now!</p>
+<table class="center">
+  <tr>
+    <th>
+        <p>Education degrees</p>
+        <svg id="education"></svg>
+    </th>
+    <th>
+        <p>Percentage of Education degrees</p>
+        <svg id="education_fraction"></svg>
+    </th>
+  </tr>
+  <tr>
+    <th>
+        <p>Social sciences and history degrees</p>
+        <svg id="social_graph"></svg>
+    </th>
+    <th>
+        <p>Percentage of Social sciences and history degrees</p>
+        <svg id="social_graph_fraction"></svg>
+    </th>
+  </tr>
+</table>
+<div class="center">
+    <a href="scene1.html" class="previous">&laquo; Back</a>
+    <a href="scene3.html" class="next">Continue &raquo;</a>
+</div>
+</body>
+<script>
+
+function getSvgWithMargins(id, width, height, margin) {
+    return d3.select(id)
+            .attr("width", width + 2*margin)
+            .attr("height", height + 2*margin)
+        .append("g")
+            .attr("transform", "translate(" + margin + "," + margin + ")");
+}
+
+function formatXAxis(svg, height, x, ticks) {
+    svg.append("g")
+        .attr("transform", "translate(0," + (height*0.82) + ")")
+        .call(d3.axisBottom(x)
+            .tickSize(-height*0.82)
+            .tickValues(ticks)
+            .tickFormat(d3.format(".4")))
+        .select(".domain").remove();
+    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
+}
+
+function formatYAxisPercent(svg, width, y) {
+    let percents = []
+    for (let i = -0.5; i <= 0.5; i += 0.1) {
+        percents.push(i);
+    }
+    let a = svg.append("g")
+        .call(d3.axisLeft(y)
+            .tickSize(-width)
+            .tickValues(percents)
+            .tickFormat((d) => "" + Math.round(100*(0.5-d)) + "%"))
+        .select(".domain").remove();
+    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
+}
+
+function getFraction (data) {
+    let fraction = [];
+    for (let i = 0; i < data.length; i++) {
+        let sum = 0;
+        for (let key in data[i]) {
+            if (key != 'Year') {
+                sum += parseInt(data[i][key]);
+            }
+        }
+
+        fraction.push({});
+        for (let key in data[i]) {
+            if (key == 'Year') {
+                fraction[i][key] = parseInt(data[i][key]);
+            } else {    
+                fraction[i][key] = parseInt(data[i][key]) / sum;
+            }
+        }
+    }
+    return fraction;
+}
+
+function generateArea(x, y) {
+    return d3.area()
+    .x(function(d) { return x(d.data.Year); })
+    .y0(function(d) { return y(d[0]); })
+    .y1(function(d) { return y(d[1]); });
+}
+
+function getBounds(element) {
+    return element.node().getBoundingClientRect();
+}
+
+async function init() {
+    let margin = 30,
+        width = 500 - 2*margin;
+        height = 400 - 2*margin;
+
+    let svg = getSvgWithMargins("#stream_graph", width, height, margin);
+    let svgFraction = getSvgWithMargins("#stream_graph_fraction", width, height, margin);
+
+    data = await d3.csv("https://rm36.github.io/degrees_conferred.csv");
+    let fraction = getFraction(data);
+
+    // Get the header of the csv files
+    let keys = data.columns.slice(1);
+
+    let xScale = d3.scaleLinear()
+        .domain(d3.extent(data, function(d) { return d.Year; })).range([ 0, width ]);
+
+    let years = [1971, 1980, 1990, 2000, 2010, 2020];
+    formatXAxis(svg, height, xScale, years);
+    formatXAxis(svgFraction, height, xScale, years);
+
+    let yScale = d3.scaleLinear().domain([-1000000, 1000000]).range([0, height * 0.8]);
+    let yFractionScale = d3.scaleLinear().domain([-0.5, 0.5]).range([0, height * 0.8]);
+
+    formatYAxisPercent(svgFraction, width, yFractionScale);
+
+    let color = d3.scaleOrdinal().domain(keys).range(d3.schemeCategory10);
+
+    let stackedData = d3.stack().offset(d3.stackOffsetSilhouette).keys(keys)(data);
+    let stackedDataFraction = d3.stack().offset(d3.stackOffsetSilhouette).keys(keys)(fraction);
+
+    let majorText = svg
+        .append("text")
+        .attr("x", 0)
+        .attr("y", 0)
+        .style("opacity", 0)
+        .style("font-size", 17);
+
+    // Start with two identical annotations
+    const annotations = [
+      {
+        note: {
+          label: "",
+          title: "",
+          bgPadding: 0,
+          align: "left",
+          wrapSplitter: /\n/,
+        },
+        x: 0,
+        y: 0,
+        dy: 50,
+        dx: 50,
+        color: "#000000",
+        connector: { end: "dot" },
+        type: d3.annotationCalloutElbow,
+      },
+      {}
+    ];
+    annotations[1] = annotations[0];
+
+    function findNearest(x, y, index, major) {
+        exactYear = xScale.invert(x);
+        let closestDist = 20,
+            closestYear = 2020,
+            closestEnrolled = 0,
+            accumEnrolled = 0,
+            closestFraction = 0,
+            accumFraction = 0;
+        let degreesData = stackedData[index],
+            fractionData = stackedDataFraction[index];
+        for (let i = 0; i < data.length; i++) {
+            year = degreesData[i].data.Year;
+            let dist = Math.abs(exactYear - year);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestYear = year;
+                closestEnrolled = degreesData[i].data[major];
+                accumEnrolled = degreesData[i];
+                closestFraction = fractionData[i].data[major];
+                accumFraction = fractionData[i];
+            }
+        }
+        averageAccumValue = (accumEnrolled[0]+accumEnrolled[1])/2;
+        averageAccumFraction = (accumFraction[0]+accumFraction[1])/2;
+        return {'year': closestYear,
+                'x': xScale(closestYear),
+                'y': yScale(averageAccumValue),
+                'enrolled': closestEnrolled,
+                'yRelative': yFractionScale(averageAccumFraction),
+                'enrolledFraction': closestFraction};
+    }
+
+    function formatMajorAndYear(major, year) {
+        let majorStr = major;
+        let maxLength = 12;
+        if (major.length > maxLength + 3) {
+            majorStr = major.substring(0, maxLength) + "...";
+        }
+        return year + "\n" + majorStr;
+    }
+
+    function formatEnrolled(enrolled) {
+        return d3.format(",.8")(enrolled);
+    }
+    function formatEnrolledPercent(enrolled) {
+        return d3.format("00.2%")(enrolled);
+    }
+
+    function updateTooltipDegrees(tooltip, x, y, major, nearest) {
+        tooltip.x = nearest.x;
+        tooltip.y = nearest.y;
+        tooltip.note.title = formatMajorAndYear(major, nearest.year);
+        tooltip.note.label = formatEnrolled(nearest.enrolled);
+    }
+    function updateTooltipRelative(tooltip, x, y, major, nearest) {
+        tooltip.x = nearest.x;
+        tooltip.y = nearest.yRelative;
+        tooltip.note.title = formatMajorAndYear(major, nearest.year);
+        tooltip.note.label = formatEnrolledPercent(nearest.enrolledFraction);
+    }
+    function updateTooltipFormat(tooltip, bounds, x, y) {
+        tooltip.dx = (x - bounds.left < bounds.width / 2) ? 100 : -100;
+        tooltip.dy = (y - bounds.top < bounds.height / 2) ? 50 : -50;
+    }
+    let updateTooltips = function(x, y, i, bounds) {
+        major = keys[i];
+        majorText.text(major);
+        let nearest = findNearest(x - bounds.left, y, i, major);
+        updateTooltipFormat(annotations[0], bounds, x, y);
+        updateTooltipFormat(annotations[1], bounds, x, y);
+
+        updateTooltipDegrees(annotations[0], x, y, major, nearest);
+        makeAnnotations.annotations([annotations[0]]);
+        makeAnnotations.update();
+        updateTooltipRelative(annotations[1], x, y, major, nearest);
+        makeAnnotationsFraction.annotations([annotations[1]]);
+        makeAnnotationsFraction.update();
+    }
+
+    // Reactive mouse callbacks
+    let mouseover = function(d) {
+        majorText.style("opacity", 1);
+        d3.selectAll(".degreeArea").style("opacity", 0.25);
+        d3.selectAll(".degreeAreaRelative").style("opacity", 0.25);
+
+        // Select the corresponding node to the index
+        d3.select(degreeAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
+        d3.select(fractionAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
+    }
+    let mouseleave = function(d) {
+        majorText.style("opacity", 0);
+        d3.selectAll(".degreeArea").style("opacity", 1).style("stroke", "none");
+        d3.selectAll(".degreeAreaRelative").style("opacity", 1).style("stroke", "none");
+        d3.selectAll('.annotations').remove();
+    }
+    let mousemoveDegrees = function(d, i) {
+        updateTooltips(d3.event.x - 10, d3.event.y, i, getBounds(svg));
+    }
+    let mousemoveRelative = function(d, i) {
+        updateTooltips(d3.event.x - 20, d3.event.y, i, getBounds(svgFraction));
+    }
+
+    let area = generateArea(xScale, yScale);
+    let areaFraction = generateArea(xScale, yFractionScale);
+
+    let degreeAreas = svg.selectAll("layerData")
+        .data(stackedData)
+        .enter()
+        .append("path")
+            .attr("class", "degreeArea")
+        .style("fill", function(d) { return color(d.key); })
+            .attr("d", area);
+
+    let fractionAreas = svgFraction.selectAll("layerData")
+        .data(stackedDataFraction)
+        .enter()
+        .append("path")
+            .attr("class", "degreeAreaRelative")
+        .style("fill", function(d) { return color(d.key); })
+            .attr("d", areaFraction);
+
+    // Add annotation to the chart on top of areas
+    makeAnnotations = d3.annotation().annotations(annotations);
+    makeAnnotationsFraction = d3.annotation().annotations(annotations);
+    svg.append("g").call(makeAnnotations);
+    svgFraction.append("g").call(makeAnnotationsFraction);
+    d3.selectAll('.annotations').remove();
+
+    // Add mouse over events on top of the annotation
+    svg.selectAll("layerDataHover")
+        .data(stackedData)
+        .enter()
+        .append("path")
+            .attr("class", "degreeAreaHover")
+        .style("fill", function(d) { return color(d.key); })
+            .attr("d", area)
+        .style("opacity", 0)
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemoveDegrees)
+        .on("mouseleave", mouseleave);
+
+    svgFraction.selectAll("layerDataHover")
+        .data(stackedDataFraction)
+        .enter()
+        .append("path")
+            .attr("class", "degreeAreaRelativeHover")
+        .style("fill", function(d) { return color(d.key); })
+            .attr("d", areaFraction)
+        .style("opacity", 0)
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemoveRelative)
+        .on("mouseleave", mouseleave);
+
+    // Year labels
+    svg.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", height-30 )
+        .text("Year");
+    svgFraction.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", height-30 )
+        .text("Year");
+}
+
+</script>
+</body>
+</html>
