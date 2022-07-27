@@ -23,8 +23,8 @@ function formatXAxis(svg, height, x, ticks) {
             .tickSize(-height*0.82)
             .tickValues(ticks)
             .tickFormat(d3.format(".4")))
-        .select(".domain").remove()
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb")
+        .select(".domain").remove();
+    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
 }
 
 function formatYAxisPercent(svg, width, y) {
@@ -37,8 +37,8 @@ function formatYAxisPercent(svg, width, y) {
             .tickSize(-width)
             .tickValues(percents)
             .tickFormat((d) => "" + Math.round(100*(0.5-d)) + "%"))
-        .select(".domain").remove()
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb")
+        .select(".domain").remove();
+    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
 }
 
 function getFraction (data) {
@@ -67,7 +67,7 @@ function generateArea(x, y) {
     return d3.area()
     .x(function(d) { return x(d.data.Year); })
     .y0(function(d) { return y(d[0]); })
-    .y1(function(d) { return y(d[1]); })
+    .y1(function(d) { return y(d[1]); });
 }
 
 async function init() {
@@ -82,12 +82,12 @@ async function init() {
     let fraction = getFraction(data);
 
     // Get the header of the csv files
-    let keys = data.columns.slice(1)
+    let keys = data.columns.slice(1);
 
     let x = d3.scaleLinear()
         .domain(d3.extent(data, function(d) { return d.Year; })).range([ 0, width ]);
 
-    let years = [1971, 1980, 1990, 2000, 2010, 2020]
+    let years = [1971, 1980, 1990, 2000, 2010, 2020];
     formatXAxis(svg, height, x, years);
     formatXAxis(svgFraction, height, x, years);
 
@@ -106,7 +106,7 @@ async function init() {
         .attr("x", 0)
         .attr("y", 0)
         .style("opacity", 0)
-        .style("font-size", 17)
+        .style("font-size", 17);
 
     const annotations = [
       {
@@ -171,17 +171,17 @@ async function init() {
 
     function updateTooltipDegrees(tooltip, x, y, major, data) {
         let nearest = findNearest(x, data, major);
-        tooltip.dx = getCenteredDx(x)
-        tooltip.dy = getCenteredDy(y)
+        tooltip.dx = getCenteredDx(x);
+        tooltip.dy = getCenteredDy(y);
         tooltip.x = nearest.x - margin - 5;
         tooltip.y = y - margin - 7;
         tooltip.note.title = formatMajorAndYear(major, nearest.year);
-        tooltip.note.label = "Enrolled: " + formatEnrolled(nearest.enrolled);
+        tooltip.note.label = "Enrolled: " + formatEnrolled(nearest.enrolled) + "\n";
     }
     function updateTooltipRelative(tooltip, x, y, major, data) {
         let nearest = findNearest(x, data, major);
-        tooltip.dx = getCenteredDx(x)
-        tooltip.dy = getCenteredDy(y)
+        tooltip.dx = getCenteredDx(x);
+        tooltip.dy = getCenteredDy(y);
         tooltip.x = nearest.x - margin - 5;
         tooltip.y = y - margin - 7;
         tooltip.note.title = formatMajorAndYear(major, nearest.year);
@@ -189,16 +189,20 @@ async function init() {
     }
 
     // Add annotation to the chart
-    makeAnnotations = d3.annotation().annotations(annotations)
-    makeAnnotationsFraction = d3.annotation().annotations(annotations)
-    svg.append("g").call(makeAnnotations)
-    svgFraction.append("g").call(makeAnnotationsFraction)
+    makeAnnotations = d3.annotation().annotations(annotations);
+    makeAnnotationsFraction = d3.annotation().annotations(annotations);
+    svg.append("g").call(makeAnnotations);
+    svgFraction.append("g").call(makeAnnotationsFraction);
 
     // Reactive mouse callbacks
     let mouseover = function(d) {
-        majorText.style("opacity", 1)
-        d3.selectAll(".degreeArea").style("opacity", 0.25)
-        d3.select(this).style("stroke", "black").style("opacity", 1)
+        majorText.style("opacity", 1);
+        d3.selectAll(".degreeArea").style("opacity", 0.25);
+        d3.selectAll(".degreeAreaRelative").style("opacity", 0.25);
+
+        // Select the corresponding node to the index.
+        d3.select(dataAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
+        d3.select(fractionsAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
     }
     let mousemoveDegrees = function(d,i) {
         major = keys[i];
@@ -215,14 +219,15 @@ async function init() {
         makeAnnotationsFraction.update();
     }
     let mouseleave = function(d) {
-        majorText.style("opacity", 0)
-        d3.selectAll(".degreeArea").style("opacity", 1).style("stroke", "none")
+        majorText.style("opacity", 0);
+        d3.selectAll(".degreeArea").style("opacity", 1).style("stroke", "none");
+        d3.selectAll(".degreeAreaRelative").style("opacity", 1).style("stroke", "none");
     }
 
     let area = generateArea(x, y);
     let areaFraction = generateArea(x, yFraction);
 
-    svg.selectAll("layerData")
+    let dataAreas = svg.selectAll("layerData")
         .data(stackedData)
         .enter()
         .append("path")
@@ -231,18 +236,18 @@ async function init() {
             .attr("d", area)
         .on("mouseover", mouseover)
         .on("mousemove", mousemoveDegrees)
-        .on("mouseleave", mouseleave)
+        .on("mouseleave", mouseleave);
 
-    svgFraction.selectAll("layerData")
+    let fractionsAreas = svgFraction.selectAll("layerDataRelative")
         .data(stackedDataFraction)
         .enter()
         .append("path")
-            .attr("class", "degreeArea")
+            .attr("class", "degreeAreaRelative")
         .style("fill", function(d) { return color(d.key); })
             .attr("d", areaFraction)
         .on("mouseover", mouseover)
         .on("mousemove", mousemoveRelative)
-        .on("mouseleave", mouseleave)
+        .on("mouseleave", mouseleave);
 
     // Year labels
     svg.append("text")
