@@ -41,9 +41,9 @@ circle {stroke: black;}
 </style>
 </head>
 <body onload='init()'>
-<h1>Are Americans getting educated?</h1>
+<h1>Are Americans getting more educated?</h1>
 <p>By Rodrigo Mendoza</p>
-<p> For <strong>Education</strong> majors, however, this number has been decreasing <strong>drastically!</strong></p>
+<p> For <strong>Education</strong> majors, however, this number has been <strong>decreasing!</strong></p>
 <p> And for <strong>Social sciences and history (SS&H)</strong>, the number has been steady over the years. This means the percentage of graduates is now much lower than before!</p>
 <table class="center">
   <tr>
@@ -273,24 +273,79 @@ async function init() {
         .attr("y", height-30 )
         .text("Year");
 
-    const annotations = [
+    const eduAnnotations = [
       {
         note: {
-          label: "",
-          title: "",
+          title: "1971",
+          label: "21% of degrees were Education majors",
           bgPadding: 0,
           align: "left",
           wrapSplitter: /\n/,
         },
-        x: 0,
-        y: 0,
-        dy: 50,
-        dx: 50,
-        color: "#000000",
+        x: xScale(1971),
+        y: yRelativeScale(0.21),
+        dy: -5,
+        dx: 140,
+        color: "#bb0000",
         connector: { end: "dot" },
         type: d3.annotationCalloutElbow,
-      }
+      },
+      {
+        note: {
+          title: "2020",
+          label: "Only 4% of degrees are Education majors",
+          bgPadding: 0,
+          align: "left",
+          wrapSplitter: /\n/,
+        },
+        x: xScale(2020),
+        y: yRelativeScale(0.041),
+        dy: -100,
+        dx: -300,
+        color: "#bb0000",
+        connector: { end: "dot" },
+        type: d3.annotationCalloutElbow,
+      },
     ];
+    makeAnnotationsEdu = d3.annotation().annotations(eduAnnotations);
+    svgEduRelative.append("g").call(makeAnnotationsEdu);
+
+    const sshAnnotations = [
+      {
+        note: {
+          title: "1971",
+          label: "18.5% of degrees were SS&H majors",
+          bgPadding: 0,
+          align: "left",
+          wrapSplitter: /\n/,
+        },
+        x: xScale(1971),
+        y: yRelativeScale(0.185),
+        dy: -5,
+        dx: 140,
+        color: "#bb0000",
+        connector: { end: "dot" },
+        type: d3.annotationCalloutElbow,
+      },
+      {
+        note: {
+          title: "2020",
+          label: "8% of degrees are SS&H majors",
+          bgPadding: 0,
+          align: "left",
+          wrapSplitter: /\n/,
+        },
+        x: xScale(2020),
+        y: yRelativeScale(0.08),
+        dy: -50,
+        dx: -300,
+        color: "#bb0000",
+        connector: { end: "dot" },
+        type: d3.annotationCalloutElbow,
+      },
+    ];
+    makeAnnotationsSsh = d3.annotation().annotations(sshAnnotations);
+    svgSshRelative.append("g").call(makeAnnotationsSsh);
 }
 
 </script>
