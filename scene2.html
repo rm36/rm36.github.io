@@ -41,10 +41,10 @@ circle {stroke: black;}
 </style>
 </head>
 <body onload='init()'>
-<h1>Degrees conferred by year in the USA</h1>
+<h1>Are Americans getting educated?</h1>
 <p>By Rodrigo Mendoza</p>
 <p> For <strong>Education</strong> majors, however, this number has been decreasing <strong>drastically!</strong></p>
-<p> And for <strong>Social sciences and history</strong>, the number has been steady over the years. This means the percentage of graduates is much lower now!</p>
+<p> And for <strong>Social sciences and history (SS&H)</strong>, the number has been steady over the years. This means the percentage of graduates is now much lower than before!</p>
 <table class="center">
   <tr>
     <th>
@@ -52,17 +52,17 @@ circle {stroke: black;}
         <svg id="education"></svg>
     </th>
     <th>
-        <p>Percentage of Education degrees</p>
+        <p>Fraction relative to all degrees</p>
         <svg id="education_fraction"></svg>
     </th>
   </tr>
   <tr>
     <th>
-        <p>Social sciences and history degrees</p>
+        <p>SS&H degrees</p>
         <svg id="social_graph"></svg>
     </th>
     <th>
-        <p>Percentage of Social sciences and history degrees</p>
+        <p>Fraction relative to all degrees</p>
         <svg id="social_graph_fraction"></svg>
     </th>
   </tr>
@@ -71,6 +71,7 @@ circle {stroke: black;}
     <a href="scene1.html" class="previous">&laquo; Back</a>
     <a href="scene3.html" class="next">Continue &raquo;</a>
 </div>
+<br><br><br><br>
 </body>
 <script>
 
@@ -109,7 +110,7 @@ function formatYAxis(svg, width, y, max) {
 
 function formatYAxisPercent(svg, width, y, max) {
     let percents = []
-    for (let i = 0; i <= max; i += 0.2) {
+    for (let i = 0; i <= max; i += 0.05) {
         percents.push(i);
     }
     let a = svg.append("g")
@@ -137,11 +138,26 @@ function getSums(data) {
     }
     return sums;
 }
-function getRelative(sums) {
+function getData(data, field) {
+    let vals = [];
+    for (let i = 0; i < data.length; i++) {
+        let val = 0;
+        for (let key in data[i]) {
+            if (key == field) {
+                val = parseInt(data[i][key])
+            } else if (key == 'Year') {
+                year = data[i][key];
+            }
+        }
+
+        vals.push({'Year': year, 'Value': val});
+    }
+    return vals;
+}
+function getRelative(data, sums) {
     let relative = [];
-    for (let i = 0; i < sums.length; i++) {
-        console.log(sums[i])
-        relative.push({'Year': sums[i].Year, 'Value': (sums[i].Value/sums[0].Value)});
+    for (let i = 0; i < data.length; i++) {
+        relative.push({'Year': data[i].Year, 'Value': (data[i].Value/sums[i].Value)});
     }
     return relative;
 }
@@ -162,37 +178,101 @@ async function init() {
         width = 500 - 2*margin;
         height = 400 - 2*margin;
 
-    let svg = getSvgWithMargins("#total_graph", width, height, margin);
-    let svgRelative = getSvgWithMargins("#total_graph_relative", width, height, margin);
+    let svgEdu = getSvgWithMargins("#education", width, height, margin);
+    let svgEduRelative = getSvgWithMargins("#education_fraction", width, height, margin);
+    let svgSsh = getSvgWithMargins("#social_graph", width, height, margin);
+    let svgSshRelative = getSvgWithMargins("#social_graph_fraction", width, height, margin);
 
     data = await d3.csv("https://rm36.github.io/degrees_conferred.csv");
-    let sums = getSums(data);
-    let relative = getRelative(sums);
-    console.log(sums, relative)
+    let sums = getSums(data),
+        education = getData(data, "Education"),
+        educationRelative = getRelative(education, sums),
+        ssh = getData(data, "Social sciences and history"),
+        sshRelative = getRelative(ssh, sums);
 
     let yearsExtent = d3.extent(data, function(d) { return d.Year; }),
-        sumsExtent = [0, 2500000],
-        relativeExtent = [0, 2.5]
+        valuesExtent = [0, 180000],
+        relativeExtent = [0, 0.25];
     let xScale = d3.scaleLinear().domain(yearsExtent).range([ 0, width ]);
 
     let years = [1971, 1980, 1990, 2000, 2010, 2020];
-    formatXAxis(svg, height, xScale, years);
-    formatXAxis(svgRelative, height, xScale, years);
+    formatXAxis(svgEdu, height, xScale, years);
+    formatXAxis(svgEduRelative, height, xScale, years);
+    formatXAxis(svgSsh, height, xScale, years);
+    formatXAxis(svgSshRelative, height, xScale, years);
 
-    let yScale = d3.scaleLinear().domain(sumsExtent).range([height * 0.8, 0]);
+    let yScale = d3.scaleLinear().domain(valuesExtent).range([height * 0.8, 0]);
     let yRelativeScale = d3.scaleLinear().domain(relativeExtent).range([height * 0.8, 0]);
-    formatYAxis(svg, width, yScale, sumsExtent[1]);
-    formatYAxisPercent(svgRelative, width, yRelativeScale, relativeExtent[1]);
+    formatYAxis(svgEdu, width, yScale, valuesExtent[1]);
+    formatYAxisPercent(svgEduRelative, width, yRelativeScale, relativeExtent[1]);
+    formatYAxis(svgSsh, width, yScale, valuesExtent[1]);
+    formatYAxisPercent(svgSshRelative, width, yRelativeScale, relativeExtent[1]);
 
-    let keys = ["Value"];
     let line = d3.line().x(function(d) { return xScale(d.Year); })
                         .y(function(d) { return yScale(d.Value); });
     let lineRelative = d3.line().x(function(d) { return xScale(d.Year); })
                                 .y(function(d) { return yRelativeScale(d.Value); });
     console.log(line);
 
+    let valuesArea = d3.area()
+        .x(function(d) { return xScale(d.Year); })
+        .y0(height * 0.8)
+        .y1(function(d) { return yScale(d.Value); });
+    let relativeArea = d3.area()
+        .x(function(d) { return xScale(d.Year); })
+        .y0(height * 0.8)
+        .y1(function(d) { return yRelativeScale(d.Value); });
 
-    // Start with two identical annotations
+    svgEdu.append("path")
+            .datum(education)
+            .attr("d", valuesArea)
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("fill", "#17becf")
+
+    svgEduRelative.append("path")
+            .datum(educationRelative)
+            .attr("d", relativeArea)
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("fill", "#17becf")
+
+    svgSsh.append("path")
+            .datum(ssh)
+            .attr("d", valuesArea)
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("fill", "#2ca02c")
+
+    svgSshRelative.append("path")
+            .datum(sshRelative)
+            .attr("d", relativeArea)
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("fill", "#2ca02c")
+
+    // Year labels
+    svgEdu.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", height-30 )
+        .text("Year");
+    svgEduRelative.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", height-30 )
+        .text("Year");
+    svgSsh.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", height-30 )
+        .text("Year");
+    svgSshRelative.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", height-30 )
+        .text("Year");
+
     const annotations = [
       {
         note: {
@@ -211,43 +291,6 @@ async function init() {
         type: d3.annotationCalloutElbow,
       }
     ];
-
-    let sumsArea = d3.area()
-        .x(function(d) { return xScale(d.Year); })
-        .y0(height * 0.8)
-        .y1(function(d) { return yScale(d.Value); });
-    let relativeArea = d3.area()
-        .x(function(d) { return xScale(d.Year); })
-        .y0(height * 0.8)
-        .y1(function(d) { return yRelativeScale(d.Value); });
-
-    let degreeAreas = svg
-        .append("path")
-            .datum(sums)
-            .attr("d", sumsArea)
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "#888888")
-
-    let RelativeAreas = svgRelative
-        .append("path")
-            .datum(relative)
-            .attr("d", relativeArea)
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "#888888")
-
-    // Year labels
-    svg.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-30 )
-        .text("Year");
-    svgRelative.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-30 )
-        .text("Year");
 }
 
 </script>
