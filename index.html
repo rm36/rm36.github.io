@@ -70,6 +70,10 @@ function generateArea(x, y) {
     .y1(function(d) { return y(d[1]); });
 }
 
+function getBounds(element) {
+    return element.node().getBoundingClientRect();
+}
+
 async function init() {
     let margin = 30,
         width = 500 - 2*margin;
@@ -84,17 +88,17 @@ async function init() {
     // Get the header of the csv files
     let keys = data.columns.slice(1);
 
-    let x = d3.scaleLinear()
+    let xScale = d3.scaleLinear()
         .domain(d3.extent(data, function(d) { return d.Year; })).range([ 0, width ]);
 
     let years = [1971, 1980, 1990, 2000, 2010, 2020];
-    formatXAxis(svg, height, x, years);
-    formatXAxis(svgFraction, height, x, years);
+    formatXAxis(svg, height, xScale, years);
+    formatXAxis(svgFraction, height, xScale, years);
 
-    let y = d3.scaleLinear().domain([-1000000, 1000000]).range([0, height * 0.8]);
-    let yFraction = d3.scaleLinear().domain([-0.5, 0.5]).range([0, height * 0.8]);
+    let yScale = d3.scaleLinear().domain([-1000000, 1000000]).range([0, height * 0.8]);
+    let yFractionScale = d3.scaleLinear().domain([-0.5, 0.5]).range([0, height * 0.8]);
 
-    formatYAxisPercent(svgFraction, width, yFraction);
+    formatYAxisPercent(svgFraction, width, yFractionScale);
 
     let color = d3.scaleOrdinal().domain(keys).range(d3.schemeCategory10);
 
@@ -123,15 +127,12 @@ async function init() {
       }
     ];
 
-    let yearScale = d3.scaleLinear()
-        .domain([margin, width+margin])
-        .range([years[0], years[years.length - 1]]);
-
-    function findNearest(x, data, major) {
-        exactYear = yearScale(x);
+    function findNearest(x, y, data, major) {
+        exactYear = xScale.invert(x - margin);
         let closestDist = 20;
         let closestYear = 2020;
         let closestEnrolled = 0;
+        let accumEnrolled = 0;
         for (let i = 0; i < data.length; i++) {
             year = data[i].data.Year;
             let dist = Math.abs(exactYear - year);
@@ -139,10 +140,14 @@ async function init() {
                 closestDist = dist;
                 closestYear = year;
                 closestEnrolled = data[i].data[major];
+                accumEnrolled = data[i];
             }
         }
+        averageAccumValue = (accumEnrolled[0]+accumEnrolled[1])/2;
         return {'year': closestYear,
-                'x': yearScale.invert(closestYear),
+                'x': xScale(closestYear) + margin,
+                'y': yScale(averageAccumValue),
+                'yRelative': yFractionScale(averageAccumValue),
                 'enrolled': closestEnrolled};
     }
 
@@ -162,37 +167,33 @@ async function init() {
         return d3.format("00.2%")(enrolled);
     }
 
-    function getCenteredDx(x) {
-        return (x < width/2) ? 50 : -50;
+    function getCenteredDx(x, left, width) {
+        return (x - left < width/2) ? 50 : -50;
     }
-    function getCenteredDy(y) {
-        return (y < height/2) ? 50 : -50;
+    function getCenteredDy(y, top, height) {
+        return (y - top < height/2) ? 50 : -50;
     }
 
     function updateTooltipDegrees(tooltip, x, y, major, data) {
-        let nearest = findNearest(x, data, major);
-        tooltip.dx = getCenteredDx(x);
-        tooltip.dy = getCenteredDy(y);
-        tooltip.x = nearest.x - margin - 5;
-        tooltip.y = y - margin - 7;
+        let nearest = findNearest(x, y, data, major);
+        bounds = getBounds(svg);
+        tooltip.dx = getCenteredDx(x, bounds.left, bounds.width);
+        tooltip.dy = getCenteredDy(y, bounds.top, bounds.height);
+        tooltip.x = nearest.x - margin;
+        tooltip.y = nearest.y;
         tooltip.note.title = formatMajorAndYear(major, nearest.year);
         tooltip.note.label = "Enrolled: " + formatEnrolled(nearest.enrolled) + "\n";
     }
     function updateTooltipRelative(tooltip, x, y, major, data) {
-        let nearest = findNearest(x, data, major);
-        tooltip.dx = getCenteredDx(x);
-        tooltip.dy = getCenteredDy(y);
-        tooltip.x = nearest.x - margin - 5;
-        tooltip.y = y - margin - 7;
+        let nearest = findNearest(x, y, data, major);
+        bounds = getBounds(svgFraction);
+        tooltip.dx = getCenteredDx(x, bounds.left, bounds.width);
+        tooltip.dy = getCenteredDy(y, bounds.top, bounds.height);
+        tooltip.x = nearest.x - margin;
+        tooltip.y = nearest.yRelative;
         tooltip.note.title = formatMajorAndYear(major, nearest.year);
         tooltip.note.label = "Enrolled: " + formatEnrolledPercent(nearest.enrolled);
     }
-
-    // Add annotation to the chart
-    makeAnnotations = d3.annotation().annotations(annotations);
-    makeAnnotationsFraction = d3.annotation().annotations(annotations);
-    svg.append("g").call(makeAnnotations);
-    svgFraction.append("g").call(makeAnnotationsFraction);
 
     // Reactive mouse callbacks
     let mouseover = function(d) {
@@ -200,9 +201,9 @@ async function init() {
         d3.selectAll(".degreeArea").style("opacity", 0.25);
         d3.selectAll(".degreeAreaRelative").style("opacity", 0.25);
 
-        // Select the corresponding node to the index.
-        d3.select(dataAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
-        d3.select(fractionsAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
+        // Select the corresponding node to the index
+        d3.select(degreeAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
+        d3.select(fractionAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
     }
     let mousemoveDegrees = function(d,i) {
         major = keys[i];
@@ -222,29 +223,56 @@ async function init() {
         majorText.style("opacity", 0);
         d3.selectAll(".degreeArea").style("opacity", 1).style("stroke", "none");
         d3.selectAll(".degreeAreaRelative").style("opacity", 1).style("stroke", "none");
+        d3.selectAll('.annotations').remove();
     }
 
-    let area = generateArea(x, y);
-    let areaFraction = generateArea(x, yFraction);
+    let area = generateArea(xScale, yScale);
+    let areaFraction = generateArea(xScale, yFractionScale);
 
-    let dataAreas = svg.selectAll("layerData")
+    let degreeAreas = svg.selectAll("layerData")
         .data(stackedData)
         .enter()
         .append("path")
             .attr("class", "degreeArea")
         .style("fill", function(d) { return color(d.key); })
-            .attr("d", area)
-        .on("mouseover", mouseover)
-        .on("mousemove", mousemoveDegrees)
-        .on("mouseleave", mouseleave);
+            .attr("d", area);
 
-    let fractionsAreas = svgFraction.selectAll("layerDataRelative")
+    let fractionAreas = svgFraction.selectAll("layerDataRelative")
         .data(stackedDataFraction)
         .enter()
         .append("path")
             .attr("class", "degreeAreaRelative")
         .style("fill", function(d) { return color(d.key); })
+            .attr("d", areaFraction);
+
+    // Add annotation to the chart on top of areas
+    makeAnnotations = d3.annotation().annotations(annotations);
+    makeAnnotationsFraction = d3.annotation().annotations(annotations);
+    svg.append("g").call(makeAnnotations);
+    svgFraction.append("g").call(makeAnnotationsFraction);
+    d3.selectAll('.annotations').remove();
+
+    // Add mouse over events on top of the annotation
+    svg.selectAll("layerDataHover")
+        .data(stackedData)
+        .enter()
+        .append("path")
+            .attr("class", "degreeAreaHover")
+        .style("fill", function(d) { return color(d.key); })
+            .attr("d", area)
+        .style("opacity", 0)
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemoveDegrees)
+        .on("mouseleave", mouseleave);
+
+    svgFraction.selectAll("layerDataRelativeHover")
+        .data(stackedDataFraction)
+        .enter()
+        .append("path")
+            .attr("class", "degreeAreaRelativeHover")
+        .style("fill", function(d) { return color(d.key); })
             .attr("d", areaFraction)
+        .style("opacity", 0)
         .on("mouseover", mouseover)
         .on("mousemove", mousemoveRelative)
         .on("mouseleave", mouseleave);
