@@ -59,11 +59,9 @@ circle {stroke: black;}
   </tr>
   <tr>
     <th>
-        <p>Number of degrees</p>
         <svg id="single_graph"></svg>
     </th>
     <th>
-        <p>Fraction relative to all degrees</p>
         <svg id="single_graph_fraction"></svg>
     </th>
   </tr>
@@ -96,16 +94,32 @@ function formatXAxis(svg, height, x, ticks) {
     svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
 }
 
-function formatYAxisPercent(svg, width, y) {
+function formatYAxis(svg, width, y, max) {
+    let values = []
+    for (let i = 0; i <= max; i += max/10) {
+        values.push(i);
+    }
+    let a = svg.append("g")
+        .call(d3.axisLeft(y)
+            .tickSize(-width)
+            .tickValues(values)
+            .tickFormat((d) => "" + (d)/1000 + "k"))
+        .select(".domain").remove();
+    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
+}
+
+function formatYAxisPercent(svg, width, y, numTicks) {
     let percents = []
-    for (let i = -0.5; i <= 0.5; i += 0.1) {
+    let min = y.domain()[0],
+        max = y.domain()[1];
+    for (let i = min; i <= max; i += (max-min)/numTicks) {
         percents.push(i);
     }
     let a = svg.append("g")
         .call(d3.axisLeft(y)
             .tickSize(-width)
             .tickValues(percents)
-            .tickFormat((d) => "" + Math.round(100*(0.5-d)) + "%"))
+            .tickFormat((d) => "" + Math.round(1000*(d-min))/10 + "%"))
         .select(".domain").remove();
     svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
 }
@@ -194,15 +208,16 @@ function getBounds(element) {
 }
 
 async function init() {
-    let margin = 30,
+    let margin = 40,
         width = 500 - 2*margin;
-        height = 400 - 2*margin/3;
+        height = 400 - 2*margin/3,
+        midHeight = height/2;
 
     let svg = getSvgWithMargins("#stream_graph", width, height, margin);
     let svgFraction = getSvgWithMargins("#stream_graph_fraction", width, height, margin);
 
-    let svgSingle = getSvgWithMargins("#single_graph", width, height, margin);
-    let svgSingleRelative = getSvgWithMargins("#single_graph_fraction", width, height, margin);
+    let svgSingle = getSvgWithMargins("#single_graph", width, midHeight, margin);
+    let svgSingleRelative = getSvgWithMargins("#single_graph_fraction", width, midHeight, margin);
 
     data = await d3.csv("https://rm36.github.io/degrees_conferred.csv");
     let fraction = getFraction(data);
@@ -220,16 +235,23 @@ async function init() {
     let years = [1971, 1980, 1990, 2000, 2010, 2020];
     formatXAxis(svg, height, xScale, years);
     formatXAxis(svgFraction, height, xScale, years);
+    formatXAxis(svgSingle, midHeight, xScale, years);
+    formatXAxis(svgSingleRelative, midHeight, xScale, years);
 
-    let yScale = d3.scaleLinear().domain([-1000000, 1000000]).range([0, height * 0.8]);
-    let yFractionScale = d3.scaleLinear().domain([-0.5, 0.5]).range([0, height * 0.8]);
+    let yScale = d3.scaleLinear().domain([-1000000, 1000000]).range([height * 0.8, 0]),
+        yFractionScale = d3.scaleLinear().domain([-0.5, 0.5]).range([height * 0.8, 0]);
 
-    formatYAxisPercent(svgFraction, width, yFractionScale);
+    formatYAxisPercent(svgFraction, width, yFractionScale, /*numTicks=*/10);
+
+    let ySingleScale = d3.scaleLinear().domain([0, 400000]).range([midHeight * 0.8, 0]),
+        ySingleRelativeScale = d3.scaleLinear().domain([0, 0.25]).range([midHeight * 0.8, 0]);
+    formatYAxis(svgSingle, width, ySingleScale, 400000);
+    formatYAxisPercent(svgSingleRelative, width, ySingleRelativeScale, /*numTicks=*/5);
 
     let color = d3.scaleOrdinal().domain(keys).range(d3.schemeCategory10);
 
-    let stackedData = d3.stack().offset(d3.stackOffsetSilhouette).keys(keys)(data);
-    let stackedDataFraction = d3.stack().offset(d3.stackOffsetSilhouette).keys(keys)(fraction);
+    let stackedData = d3.stack().offset(d3.stackOffsetSilhouette).keys(keys)(data),
+        stackedDataFraction = d3.stack().offset(d3.stackOffsetSilhouette).keys(keys)(fraction);
 
     let majorText = svg
         .append("text")
@@ -348,6 +370,9 @@ async function init() {
         // Select the corresponding node to the index
         d3.select(degreeAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
         d3.select(fractionAreas.nodes()[d.index]).style("stroke", "black").style("opacity", 1);
+
+        updateSingleArea(d.key);
+        updateSingleRelativeArea(d.key);
     }
     let mouseleave = function(d) {
         majorText.style("opacity", 0);
@@ -413,6 +438,43 @@ async function init() {
         .on("mousemove", mousemoveRelative)
         .on("mouseleave", mouseleave);
 
+    let valuesArea = d3.area()
+        .x(function(d) { return xScale(d.Year); })
+        .y0(midHeight * 0.8)
+        .y1(function(d) { return ySingleScale(d.Value); });
+    let relativeArea = d3.area()
+        .x(function(d) { return xScale(d.Year); })
+        .y0(midHeight * 0.8)
+        .y1(function(d) { return ySingleRelativeScale(d.Value); });
+
+    svgSingle.append("path")
+            .attr("class", "singleArea")
+            .attr("d", valuesArea(singleData["Business"]))
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("fill", color("Business"));
+
+    let updateSingleArea = function(major) {
+        svgSingle.select(".singleArea")
+            .transition().duration(500)
+            .attr("d", function(d) { return valuesArea(singleData[major]) })
+            .attr("fill", color(major));
+    };
+
+    svgSingleRelative.append("path")
+            .attr("class", "singleRelativeArea")
+            .attr("d", relativeArea(singleDataRelative["Business"]))
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("fill", color("Business"));
+
+    let updateSingleRelativeArea = function(major) {
+        svgSingleRelative.select(".singleRelativeArea")
+            .transition().duration(500)
+            .attr("d", function(d) { return relativeArea(singleDataRelative[major]) })
+            .attr("fill", color(major));
+    };
+
     // Year labels
     svg.append("text")
         .attr("text-anchor", "end")
@@ -424,6 +486,31 @@ async function init() {
         .attr("x", width/2)
         .attr("y", height-30 )
         .text("Year");
+    svgSingle.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", midHeight-10 )
+        .text("Year");
+    svgSingleRelative.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width/2)
+        .attr("y", midHeight-10 )
+        .text("Year");
+
+    let leftAxisLabel = {"x": -30, "y": midHeight/2 - 110}
+    svgSingle.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", leftAxisLabel.x)
+        .attr("y", leftAxisLabel.y )
+        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
+        .text("Number of degrees (thousands)");
+
+    svgSingleRelative.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", leftAxisLabel.x)
+        .attr("y", leftAxisLabel.y )
+        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
+        .text("Fraction of degrees");
 }
 
 </script>

@@ -164,19 +164,8 @@ function getRelative(data, sums) {
     return relative;
 }
 
-function generateArea(x, y, height) {
-    return d3.area()
-    .x(function(d) { return x(d.Year); })
-    .y0(function(d) { return y(height); })
-    .y1(function(d) { return y(d.Value); });
-}
-
-function getBounds(element) {
-    return element.node().getBoundingClientRect();
-}
-
 async function init() {
-    let margin = 30,
+    let margin = 40,
         width = 500 - 2*margin;
         height = 400 - 2*margin;
 
@@ -209,11 +198,6 @@ async function init() {
     formatYAxisPercent(svgEduRelative, width, yRelativeScale, relativeExtent[1]);
     formatYAxis(svgSsh, width, yScale, valuesExtent[1]);
     formatYAxisPercent(svgSshRelative, width, yRelativeScale, relativeExtent[1]);
-
-    let line = d3.line().x(function(d) { return xScale(d.Year); })
-                        .y(function(d) { return yScale(d.Value); });
-    let lineRelative = d3.line().x(function(d) { return xScale(d.Year); })
-                                .y(function(d) { return yRelativeScale(d.Value); });
 
     let valuesArea = d3.area()
         .x(function(d) { return xScale(d.Year); })
@@ -273,6 +257,35 @@ async function init() {
         .attr("x", width/2)
         .attr("y", height-30 )
         .text("Year");
+
+    let leftAxisLabel = {"x": -30, "y": height/2 - 130}
+    svgEdu.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", leftAxisLabel.x)
+        .attr("y", leftAxisLabel.y )
+        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
+        .text("Number of degrees (thousands)");
+
+    svgEduRelative.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", leftAxisLabel.x)
+        .attr("y", leftAxisLabel.y )
+        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
+        .text("Fraction of degrees");
+
+    svgSsh.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", leftAxisLabel.x)
+        .attr("y", leftAxisLabel.y )
+        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
+        .text("Number of degrees (thousands)");
+
+    svgSshRelative.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", leftAxisLabel.x)
+        .attr("y", leftAxisLabel.y )
+        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
+        .text("Fraction of degrees");
 
     const eduAnnotations = [
       {
