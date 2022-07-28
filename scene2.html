@@ -2,69 +2,33 @@
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
 <head>
-<style>
-/* Style taken from:  https://typespiration.com/clean-slate */
-h1 { color: #333333; font-family: 'Georgia', serif; font-size: 50px; font-weight: normal; line-height: 54px; margin: 0 0 24px; }
-p { color: #333333; font-family: Georgia, serif; font-size: 18px; line-height: 28px; margin: 0 100 28px; }
-p:first-of-type { font-size: 26px; line-height: 36px; margin: 0 0 58px; text-align: center;}
-a {
-  text-decoration: none;
-  display: inline-block;
-  padding: 8px 16px;
-  font-family: 'Georgia', serif;
-  font-size: 26px;
-}
-
-a:hover {
-  background-color: #ddd;
-  color: black;
-}
-
-.previous {
-  background-color: #f1f1f1;
-  color: black;
-}
-
-.next {
-  background-color: #046DAA;
-  color: white;
-}
-
-h1 {text-align: center;}
-circle {stroke: black;}
-.center {
-    display: flex;
-    justify-content: space-around;
-  /*margin-left: auto;
-  margin-right: auto;*/
-}
-</style>
+<link rel="stylesheet" href="scene.css">
 </head>
 <body onload='init()'>
 <h1>Are Americans getting more educated?</h1>
-<p>By Rodrigo Mendoza</p>
+<p></p>
 <p> For <strong>Education</strong> majors, however, this number has been <strong>decreasing!</strong></p>
 <p> And for <strong>Social sciences and history (SS&H)</strong>, the number has been steady over the years. This means the percentage of graduates is now much lower than before!</p>
 <table class="center">
   <tr>
-    <th>
+    <td>
         <p>Education degrees</p>
         <svg id="education"></svg>
-    </th>
-    <th>
+    </td>
+    <td>
         <p>Fraction relative to all degrees</p>
         <svg id="education_fraction"></svg>
-    </th>
+    </td>
   </tr>
   <tr>
-    <th>
+    <td>
         <p>SS&H degrees</p>
         <svg id="social_graph"></svg>
-    </th>
-    <th>
+    </td>
+    <td>
         <p>Fraction relative to all degrees</p>
         <svg id="social_graph_fraction"></svg>
-    </th>
+    </td>
   </tr>
 </table>
 <div class="center">
