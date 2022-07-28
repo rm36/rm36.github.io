@@ -1,6 +1,8 @@
 <html>
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
+<script src="format_utils.js"></script>
+<script src="data_utils.js"></script>
 <head>
 <link rel="stylesheet" href="scene.css">
 </head>
@@ -40,70 +42,6 @@
 <footer>SOURCE: U.S. Department of Education, National Center for Education Statistics, Higher Education General Information Survey (HEGIS), "Degrees and Other Formal Awards Conferred" surveys, 1970-71 through 1985-86; Integrated Postsecondary Education Data System (IPEDS), "Completions Survey" (IPEDS-C:91-99); and IPEDS Fall 2000 through Fall 2020, Completions component. (The data was prepared September 2021.)</footer>
 <script>
 
-function getSvgWithMargins(id, width, height, margin) {
-    marginTop = margin / 5;
-    return d3.select(id)
-            .attr("width", width + 2*margin)
-            .attr("height", height + 2*marginTop)
-        .append("g")
-            .attr("transform", "translate(" + margin + "," + marginTop + ")");
-}
-
-function formatXAxis(svg, height, x, ticks) {
-    svg.append("g")
-        .attr("transform", "translate(0," + (height*0.82) + ")")
-        .call(d3.axisBottom(x)
-            .tickSize(-height*0.82)
-            .tickValues(ticks)
-            .tickFormat(d3.format(".4")))
-        .select(".domain").remove();
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
-function formatYAxis(svg, width, y, max) {
-    let values = []
-    for (let i = 0; i <= max; i += max/10) {
-        values.push(i);
-    }
-    let a = svg.append("g")
-        .call(d3.axisLeft(y)
-            .tickSize(-width)
-            .tickValues(values)
-            .tickFormat((d) => "" + (d)/1000 + "k"))
-        .select(".domain").remove();
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
-function formatYAxisPercent(svg, width, y, max) {
-    let percents = []
-    for (let i = 0; i <= max; i += 0.05) {
-        percents.push(i);
-    }
-    let a = svg.append("g")
-        .call(d3.axisLeft(y)
-            .tickSize(-width)
-            .tickValues(percents)
-            .tickFormat((d) => "" + Math.round(100*(d)) + "%"))
-        .select(".domain").remove();
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
-function getSums(data) {
-    let sums = [];
-    for (let i = 0; i < data.length; i++) {
-        let sum = 0;
-        for (let key in data[i]) {
-            if (key != 'Year') {
-                sum += parseInt(data[i][key]);
-            } else {
-                year = data[i][key];
-            }
-        }
-
-        sums.push({'Year': year, 'Value': sum});
-    }
-    return sums;
-}
 function getData(data, field) {
     let vals = [];
     for (let i = 0; i < data.length; i++) {
@@ -133,17 +71,19 @@ async function init() {
         width = 500 - 2*margin;
         height = 400 - 2*margin;
 
-    let svgEdu = getSvgWithMargins("#education", width, height, margin);
-    let svgEduRelative = getSvgWithMargins("#education_fraction", width, height, margin);
-    let svgSsh = getSvgWithMargins("#social_graph", width, height, margin);
-    let svgSshRelative = getSvgWithMargins("#social_graph_fraction", width, height, margin);
+    let svgEdu = getSvgWithMargins("#education", width, height, margin),
+        svgEduRelative = getSvgWithMargins("#education_fraction", width, height, margin),
+        svgSsh = getSvgWithMargins("#social_graph", width, height, margin),
+        svgSshRelative = getSvgWithMargins("#social_graph_fraction", width, height, margin);
 
     data = await d3.csv("https://rm36.github.io/degrees_conferred.csv");
     let sums = getSums(data),
-        education = getData(data, "Education"),
-        educationRelative = getRelative(education, sums),
-        ssh = getData(data, "Social sciences and history"),
-        sshRelative = getRelative(ssh, sums);
+        dataPerField = getDataPerField(data),
+        relativePerField = getRelativePerField(dataPerField, sums),
+        education = dataPerField["Education"],
+        educationRelative = relativePerField["Education"],
+        ssh = dataPerField["Social sciences and history"],
+        sshRelative = relativePerField["Social sciences and history"];
 
     let yearsExtent = d3.extent(data, function(d) { return d.Year; }),
         valuesExtent = [0, 180000],
@@ -159,97 +99,29 @@ async function init() {
     let yScale = d3.scaleLinear().domain(valuesExtent).range([height * 0.8, 0]);
     let yRelativeScale = d3.scaleLinear().domain(relativeExtent).range([height * 0.8, 0]);
     formatYAxis(svgEdu, width, yScale, valuesExtent[1]);
-    formatYAxisPercent(svgEduRelative, width, yRelativeScale, relativeExtent[1]);
+    formatYAxisPercent(svgEduRelative, width, yRelativeScale);
     formatYAxis(svgSsh, width, yScale, valuesExtent[1]);
-    formatYAxisPercent(svgSshRelative, width, yRelativeScale, relativeExtent[1]);
+    formatYAxisPercent(svgSshRelative, width, yRelativeScale);
 
-    let valuesArea = d3.area()
-        .x(function(d) { return xScale(d.Year); })
-        .y0(height * 0.8)
-        .y1(function(d) { return yScale(d.Value); });
-    let relativeArea = d3.area()
-        .x(function(d) { return xScale(d.Year); })
-        .y0(height * 0.8)
-        .y1(function(d) { return yRelativeScale(d.Value); });
+    let valuesArea = getArea(xScale, yScale, height),
+        relativeArea = getArea(xScale, yRelativeScale, height);
 
-    svgEdu.append("path")
-            .datum(education)
-            .attr("d", valuesArea)
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "#17becf")
-
-    svgEduRelative.append("path")
-            .datum(educationRelative)
-            .attr("d", relativeArea)
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "#17becf")
-
-    svgSsh.append("path")
-            .datum(ssh)
-            .attr("d", valuesArea)
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "#2ca02c")
-
-    svgSshRelative.append("path")
-            .datum(sshRelative)
-            .attr("d", relativeArea)
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "#2ca02c")
-
-    // Year labels
-    svgEdu.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-30 )
-        .text("Year");
-    svgEduRelative.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-30 )
-        .text("Year");
-    svgSsh.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-30 )
-        .text("Year");
-    svgSshRelative.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-30 )
-        .text("Year");
+    plotArea(svgEdu,            education,          valuesArea,     "#17becf");
+    plotArea(svgEduRelative,    educationRelative,  relativeArea,   "#17becf");
+    plotArea(svgSsh,            ssh,                valuesArea,     "#2ca02c");
+    plotArea(svgSshRelative,    sshRelative,        relativeArea,   "#2ca02c");
+    
+    let bottomAxisLabel = {"x":width/2, "y": height-30};
+    addHorizontalAxis(svgEdu, bottomAxisLabel, "Year");
+    addHorizontalAxis(svgEduRelative, bottomAxisLabel, "Year");
+    addHorizontalAxis(svgSsh, bottomAxisLabel, "Year");
+    addHorizontalAxis(svgSshRelative, bottomAxisLabel, "Year");
 
     let leftAxisLabel = {"x": -30, "y": height/2 - 130}
-    svgEdu.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", leftAxisLabel.x)
-        .attr("y", leftAxisLabel.y )
-        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
-        .text("Number of degrees (thousands)");
-
-    svgEduRelative.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", leftAxisLabel.x)
-        .attr("y", leftAxisLabel.y )
-        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
-        .text("Fraction of degrees");
-
-    svgSsh.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", leftAxisLabel.x)
-        .attr("y", leftAxisLabel.y )
-        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
-        .text("Number of degrees (thousands)");
-
-    svgSshRelative.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", leftAxisLabel.x)
-        .attr("y", leftAxisLabel.y )
-        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
-        .text("Fraction of degrees");
+    addLeftAxis(svgEdu, leftAxisLabel, "Number of degrees (thousands)");
+    addLeftAxis(svgEduRelative, leftAxisLabel, "Fraction of degrees");
+    addLeftAxis(svgSsh, leftAxisLabel, "Number of degrees (thousands)");
+    addLeftAxis(svgSshRelative, leftAxisLabel, "Fraction of degrees");
 
     const eduAnnotations = [
       {
@@ -263,7 +135,7 @@ async function init() {
         x: xScale(1971),
         y: yRelativeScale(0.21),
         dy: -5,
-        dx: 140,
+        dx: 120,
         color: "#bb0000",
         connector: { end: "dot" },
         type: d3.annotationCalloutElbow,
@@ -278,7 +150,7 @@ async function init() {
         },
         x: xScale(2020),
         y: yRelativeScale(0.041),
-        dy: -100,
+        dy: -80,
         dx: -300,
         color: "#bb0000",
         connector: { end: "dot" },
@@ -299,8 +171,8 @@ async function init() {
         },
         x: xScale(1971),
         y: yRelativeScale(0.185),
-        dy: -5,
-        dx: 140,
+        dy: -10,
+        dx: 120,
         color: "#bb0000",
         connector: { end: "dot" },
         type: d3.annotationCalloutElbow,

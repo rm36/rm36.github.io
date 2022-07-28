@@ -1,6 +1,8 @@
 <html>
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
+<script src="format_utils.js"></script>
+<script src="data_utils.js"></script>
 <head>
 <link rel="stylesheet" href="scene.css">
 </head>
@@ -8,7 +10,7 @@
 <h1>Are Americans getting more educated?</h1>
 <p></p>
 <p class="center">
-    Take a look by yourself with these interactive charts! Hover over the colored areas to explore each major. </p>
+    Try it out by yourself with these interactive charts! Hover over the colored areas to explore each major. </p>
     <p class="center"><strong>Enjoy!</strong></p>
 <table class="center">
   <tr>
@@ -38,56 +40,6 @@
 <footer>SOURCE: U.S. Department of Education, National Center for Education Statistics, Higher Education General Information Survey (HEGIS), "Degrees and Other Formal Awards Conferred" surveys, 1970-71 through 1985-86; Integrated Postsecondary Education Data System (IPEDS), "Completions Survey" (IPEDS-C:91-99); and IPEDS Fall 2000 through Fall 2020, Completions component. (The data was prepared September 2021.)</footer>
 <script>
 
-function getSvgWithMargins(id, width, height, margin) {
-    marginTop = margin / 2.5;
-    return d3.select(id)
-            .attr("width", width + 2*margin)
-            .attr("height", height + 2*marginTop)
-        .append("g")
-            .attr("transform", "translate(" + margin + "," + marginTop + ")");
-}
-
-function formatXAxis(svg, height, x, ticks) {
-    svg.append("g")
-        .attr("transform", "translate(0," + (height*0.82) + ")")
-        .call(d3.axisBottom(x)
-            .tickSize(-height*0.82)
-            .tickValues(ticks)
-            .tickFormat(d3.format(".4")))
-        .select(".domain").remove();
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
-function formatYAxis(svg, width, y, max) {
-    let values = []
-    for (let i = 0; i <= max; i += max/10) {
-        values.push(i);
-    }
-    let a = svg.append("g")
-        .call(d3.axisLeft(y)
-            .tickSize(-width)
-            .tickValues(values)
-            .tickFormat((d) => "" + (d)/1000 + "k"))
-        .select(".domain").remove();
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
-function formatYAxisPercent(svg, width, y, numTicks) {
-    let percents = []
-    let min = y.domain()[0],
-        max = y.domain()[1];
-    for (let i = min; i <= max; i += (max-min)/numTicks) {
-        percents.push(i);
-    }
-    let a = svg.append("g")
-        .call(d3.axisLeft(y)
-            .tickSize(-width)
-            .tickValues(percents)
-            .tickFormat((d) => "" + Math.round(1000*(d-min))/10 + "%"))
-        .select(".domain").remove();
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
 function getFraction (data) {
     let fraction = [];
     for (let i = 0; i < data.length; i++) {
@@ -110,56 +62,6 @@ function getFraction (data) {
     return fraction;
 }
 
-function getSums(data) {
-    let sums = [];
-    for (let i = 0; i < data.length; i++) {
-        let sum = 0;
-        for (let key in data[i]) {
-            if (key != 'Year') {
-                sum += parseInt(data[i][key]);
-            } else {
-                year = data[i][key];
-            }
-        }
-
-        sums.push({'Year': year, 'Value': sum});
-    }
-    return sums;
-}
-function getData(data) {
-    let allVals = {};
-    for (let i = 0; i < data.length; i++) {
-        let year = 0;
-        let vals = {};
-        for (let key in data[i]) {
-            if (key == 'Year') {
-                year = data[i][key];
-            } else {
-                vals[key] = parseInt(data[i][key]);
-            } 
-        }
-        for (let key in vals) {
-            if (!(key in allVals)) {
-                allVals[key] = [];
-            }
-            allVals[key].push({'Year': year, 'Value': vals[key]});
-        }
-    }
-    return allVals;
-}
-function getRelative(data, sums) {
-    let allRelative = {};
-    for (let key in data) {
-        for (let i = 0; i < data[key].length; i++) {
-            if (!(key in allRelative)) {
-                allRelative[key] = [];
-            }
-            allRelative[key].push({'Year': data[key][i].Year, 'Value': (data[key][i].Value/sums[i].Value)});
-        }
-    }
-    return allRelative;
-}
-
 function generateArea(x, y) {
     return d3.area()
     .x(function(d) { return x(d.data.Year); })
@@ -177,18 +79,18 @@ async function init() {
         height = 400 - 2*margin/3,
         midHeight = height/2;
 
-    let svg = getSvgWithMargins("#stream_graph", width, height, margin);
-    let svgFraction = getSvgWithMargins("#stream_graph_fraction", width, height, margin);
+    let svg = getSvgWithMargins("#stream_graph", width, height, margin, /*marginTop=*/ margin/2.5);
+    let svgFraction = getSvgWithMargins("#stream_graph_fraction", width, height, margin, /*marginTop=*/ margin/2.5);
 
-    let svgSingle = getSvgWithMargins("#single_graph", width, midHeight, margin);
-    let svgSingleRelative = getSvgWithMargins("#single_graph_fraction", width, midHeight, margin);
+    let svgSingle = getSvgWithMargins("#single_graph", width, midHeight, margin, /*marginTop=*/ margin/2.5);
+    let svgSingleRelative = getSvgWithMargins("#single_graph_fraction", width, midHeight, margin, /*marginTop=*/ margin/2.5);
 
     data = await d3.csv("https://rm36.github.io/degrees_conferred.csv");
     let fraction = getFraction(data);
 
     let sums = getSums(data),
-        singleData = getData(data),
-        singleDataRelative = getRelative(singleData, sums);
+        singleData = getDataPerField(data),
+        singleDataRelative = getRelativePerField(singleData, sums);
 
     // Get the header of the csv files
     let keys = data.columns.slice(1);
@@ -224,7 +126,7 @@ async function init() {
         .style("opacity", 0)
         .style("font-size", 17);
 
-    // Start with two identical annotations
+    // Custom annotations
     const annotations = [
       {
         note: {
@@ -278,13 +180,12 @@ async function init() {
                 'enrolledFraction': closestFraction};
     }
 
-    function formatMajorAndYear(major, year) {
+    function formatMajor(major, maxLength = 12) {
         let majorStr = major;
-        let maxLength = 12;
         if (major.length > maxLength + 3) {
             majorStr = major.substring(0, maxLength) + "...";
         }
-        return year + "\n" + majorStr;
+        return majorStr;
     }
 
     function formatEnrolled(enrolled) {
@@ -297,13 +198,13 @@ async function init() {
     function updateTooltipDegrees(tooltip, x, y, major, nearest) {
         tooltip.x = nearest.x;
         tooltip.y = nearest.y;
-        tooltip.note.title = formatMajorAndYear(major, nearest.year);
+        tooltip.note.title = nearest.year + "\n" + formatMajor(major);
         tooltip.note.label = formatEnrolled(nearest.enrolled);
     }
     function updateTooltipRelative(tooltip, x, y, major, nearest) {
         tooltip.x = nearest.x;
         tooltip.y = nearest.yRelative;
-        tooltip.note.title = formatMajorAndYear(major, nearest.year);
+        tooltip.note.title = nearest.year + "\n" + formatMajor(major);
         tooltip.note.label = formatEnrolledPercent(nearest.enrolledFraction);
     }
     function updateTooltipFormat(tooltip, bounds, x, y) {
@@ -351,8 +252,8 @@ async function init() {
         updateTooltips(d3.event.x - 20, d3.event.y, i, getBounds(svgFraction));
     }
 
-    let area = generateArea(xScale, yScale);
-    let areaFraction = generateArea(xScale, yFractionScale);
+    let area = generateArea(xScale, yScale),
+        areaFraction = generateArea(xScale, yFractionScale);
 
     let degreeAreas = svg.selectAll("layerData")
         .data(stackedData)
@@ -402,79 +303,38 @@ async function init() {
         .on("mousemove", mousemoveRelative)
         .on("mouseleave", mouseleave);
 
-    let valuesArea = d3.area()
-        .x(function(d) { return xScale(d.Year); })
-        .y0(midHeight * 0.8)
-        .y1(function(d) { return ySingleScale(d.Value); });
-    let relativeArea = d3.area()
-        .x(function(d) { return xScale(d.Year); })
-        .y0(midHeight * 0.8)
-        .y1(function(d) { return ySingleRelativeScale(d.Value); });
+    let valuesArea = getArea(xScale, ySingleScale, midHeight),
+        relativeArea = getArea(xScale, ySingleRelativeScale, midHeight);
 
-    svgSingle.append("path")
-            .attr("class", "singleArea")
-            .attr("d", valuesArea(singleData["Business"]))
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", color("Business"));
+    // Plot the area without data, instead pass the area directly to update it later.
+    plotArea(svgSingle, /*data=*/{}, valuesArea(singleData["Business"]), color("Business"), /*customClass=*/ "singleArea");
+    plotArea(svgSingleRelative, /*data=*/{}, relativeArea(singleDataRelative["Business"]), color("Business"), /*customClass=*/ "singleRelativeArea");
+
+    addHorizontalAxis(svg, {"x":width/2, "y": height-30}, "Year");
+    addHorizontalAxis(svgFraction, {"x":width/2, "y": height-30}, "Year");
+    addHorizontalAxis(svgSingle, {"x":width/2, "y": midHeight-10}, "Year");
+    addHorizontalAxis(svgSingleRelative, {"x":width/2, "y": midHeight-10}, "Year");
+
+    addHorizontalAxis(svgSingle, {"x":0, "y": -5}, "Number of Business degrees conferred (thousands)", /*customClass=*/ "singleTitle");
+    addHorizontalAxis(svgSingleRelative, {"x":0, "y": -5}, "Fraction of Business degrees", /*customClass=*/ "singleRelativeTitle");
 
     let updateSingleArea = function(major) {
         svgSingle.select(".singleArea")
             .transition().duration(500)
             .attr("d", function(d) { return valuesArea(singleData[major]) })
             .attr("fill", color(major));
+        svgSingle.select(".singleTitle")
+            .text("Number of " + formatMajor(major, 20) + " degrees conferred (thousands)");
     };
-
-    svgSingleRelative.append("path")
-            .attr("class", "singleRelativeArea")
-            .attr("d", relativeArea(singleDataRelative["Business"]))
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", color("Business"));
 
     let updateSingleRelativeArea = function(major) {
         svgSingleRelative.select(".singleRelativeArea")
             .transition().duration(500)
             .attr("d", function(d) { return relativeArea(singleDataRelative[major]) })
             .attr("fill", color(major));
+        svgSingleRelative.select(".singleRelativeTitle")
+            .text("Fraction of " + formatMajor(major, 40) + " degrees");
     };
-
-    // Year labels
-    svg.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-30 )
-        .text("Year");
-    svgFraction.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-30 )
-        .text("Year");
-    svgSingle.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", midHeight-10 )
-        .text("Year");
-    svgSingleRelative.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", midHeight-10 )
-        .text("Year");
-
-    let leftAxisLabel = {"x": -30, "y": midHeight/2 - 110}
-    svgSingle.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", leftAxisLabel.x)
-        .attr("y", leftAxisLabel.y )
-        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
-        .text("Number of degrees (thousands)");
-
-    svgSingleRelative.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", leftAxisLabel.x)
-        .attr("y", leftAxisLabel.y )
-        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
-        .text("Fraction of degrees");
 }
 
 </script>

@@ -1,6 +1,8 @@
 <html>
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
+<script src="format_utils.js"></script>
+<script src="data_utils.js"></script>
 <head>
 <link rel="stylesheet" href="scene.css">
 </head>
@@ -28,41 +30,7 @@
 <footer>SOURCE: U.S. Department of Education, National Center for Education Statistics, Higher Education General Information Survey (HEGIS), "Degrees and Other Formal Awards Conferred" surveys, 1970-71 through 1985-86; Integrated Postsecondary Education Data System (IPEDS), "Completions Survey" (IPEDS-C:91-99); and IPEDS Fall 2000 through Fall 2020, Completions component. (The data was prepared September 2021.)</footer>
 <script>
 
-function getSvgWithMargins(id, width, height, marginLeft) {
-    marginTop = marginLeft / 5;
-    return d3.select(id)
-            .attr("width", width + 2*marginLeft)
-            .attr("height", height + marginTop)
-        .append("g")
-            .attr("transform", "translate(" + marginLeft + "," + marginTop + ")");
-}
-
-function formatXAxis(svg, height, x, ticks) {
-    svg.append("g")
-        .attr("transform", "translate(0," + (height*0.82) + ")")
-        .call(d3.axisBottom(x)
-            .tickSize(-height*0.82)
-            .tickValues(ticks)
-            .tickFormat(d3.format(".4")))
-        .select(".domain").remove();
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
-function formatYAxis(svg, width, y, max) {
-    let values = []
-    for (let i = 0; i <= max; i += max/10) {
-        values.push(i);
-    }
-    let a = svg.append("g")
-        .call(d3.axisLeft(y)
-            .tickSize(-width)
-            .tickValues(values)
-            .tickFormat((d) => "" + (d)/1000 + "k"))
-        .select(".domain").remove();
-    svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
-function formatYAxisPercent(svg, width, y, min, max) {
+function formatYAxisCustomPercent(svg, width, y, min, max) {
     let values = []
     for (let i = min; i <= max; i += (min/5)) {
         values.push(i);
@@ -74,34 +42,6 @@ function formatYAxisPercent(svg, width, y, min, max) {
             .tickFormat((d) => "" + Math.round(100*d/min) + "%"))
         .select(".domain").remove();
     svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
-}
-
-function getSums(data) {
-    let sums = [];
-    for (let i = 0; i < data.length; i++) {
-        let sum = 0;
-        for (let key in data[i]) {
-            if (key != 'Year') {
-                sum += parseInt(data[i][key]);
-            } else {
-                year = data[i][key];
-            }
-        }
-
-        sums.push({'Year': year, 'Value': sum});
-    }
-    return sums;
-}
-
-function generateArea(x, y, height) {
-    return d3.area()
-    .x(function(d) { return x(d.Year); })
-    .y0(function(d) { return y(height); })
-    .y1(function(d) { return y(d.Value); });
-}
-
-function getBounds(element) {
-    return element.node().getBoundingClientRect();
 }
 
 async function init() {
@@ -122,46 +62,14 @@ async function init() {
     formatXAxis(svg, height, xScale, years);
 
     let yScale = d3.scaleLinear().domain(sumsExtent).range([height * 0.8, 0]);
-    formatYAxis(svg, width, yScale, sumsExtent[1]);
-    formatYAxisPercent(svg, width, yScale, /*min=*/839730, sumsExtent[1]);
+    formatYAxis(svg, width, yScale);
+    formatYAxisCustomPercent(svg, width, yScale, /*min=*/839730, sumsExtent[1]);
 
-    let line = d3.line().x(function(d) { return xScale(d.Year); })
-                        .y(function(d) { return yScale(d.Value); });
+    plotArea(svg, sums, getArea(xScale, yScale, height), "#046DAA");
 
-    let sumsArea = d3.area()
-        .x(function(d) { return xScale(d.Year); })
-        .y0(height * 0.8)
-        .y1(function(d) { return yScale(d.Value); });
-
-    let degreeAreas = svg
-        .append("path")
-            .datum(sums)
-            .attr("d", sumsArea)
-            .attr("stroke", "black")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "#046DAA")
-
-    svg.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", width/2)
-        .attr("y", height-20 )
-        .text("Year");
-
-    let leftAxisLabel = {"x": -40, "y": height/2 - 130}
-    svg.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", leftAxisLabel.x)
-        .attr("y", leftAxisLabel.y )
-        .attr("transform", "rotate(-90," + leftAxisLabel.x + "," + leftAxisLabel.y + ")")
-        .text("Number of degrees (thousands)");
-
-    let rightAxisLabel = {"x": width + 40, "y": height/2 + 60}
-    svg.append("text")
-        .attr("text-anchor", "end")
-        .attr("x", rightAxisLabel.x)
-        .attr("y", rightAxisLabel.y )
-        .attr("transform", "rotate(90," + rightAxisLabel.x + "," + rightAxisLabel.y + ")")
-        .text("Percentage relative to 1971");
+    addHorizontalAxis(svg, {"x":width/2, "y": height-20}, "Year");
+    addLeftAxis(svg, {"x": -40, "y": height/2 - 130}, "Number of degrees (thousands)");
+    addRightAxis(svg, {"x": width + 40, "y": height/2 + 60}, "Percentage relative to 1971");
 
     const annotations = [
       {
