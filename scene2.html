@@ -73,14 +73,16 @@ circle {stroke: black;}
 </div>
 <br><br><br><br>
 </body>
+<footer>SOURCE: U.S. Department of Education, National Center for Education Statistics, Higher Education General Information Survey (HEGIS), "Degrees and Other Formal Awards Conferred" surveys, 1970-71 through 1985-86; Integrated Postsecondary Education Data System (IPEDS), "Completions Survey" (IPEDS-C:91-99); and IPEDS Fall 2000 through Fall 2020, Completions component. (The data was prepared September 2021.)</footer>
 <script>
 
 function getSvgWithMargins(id, width, height, margin) {
+    marginTop = margin / 5;
     return d3.select(id)
             .attr("width", width + 2*margin)
-            .attr("height", height + 2*margin)
+            .attr("height", height + 2*marginTop)
         .append("g")
-            .attr("transform", "translate(" + margin + "," + margin + ")");
+            .attr("transform", "translate(" + margin + "," + marginTop + ")");
 }
 
 function formatXAxis(svg, height, x, ticks) {
@@ -212,7 +214,6 @@ async function init() {
                         .y(function(d) { return yScale(d.Value); });
     let lineRelative = d3.line().x(function(d) { return xScale(d.Year); })
                                 .y(function(d) { return yRelativeScale(d.Value); });
-    console.log(line);
 
     let valuesArea = d3.area()
         .x(function(d) { return xScale(d.Year); })

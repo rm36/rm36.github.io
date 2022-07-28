@@ -44,14 +44,14 @@ circle {stroke: black;}
 <h1>Are Americans getting more educated?</h1>
 <p>By Rodrigo Mendoza</p>
 <p>
-    Each year, the number of bachelor degrees conferred in the USA has been increasing. This is not really a surprise, but did you know the steepest increase was around <strong>2006</strong>?.</p>
+    Each year, the number of bachelor degrees conferred in the USA has been increasing. This is not really a surprise, but did you know that the steepest increase was around <strong>2006</strong>?.</p>
 <p>
     Another little-known fact is that in the last 30 years, this number has more than <strong>doubled</strong>. In 1971, the number of degrees conferred in the USA was <strong>839,730</strong>. In 2020, that number climbed to <strong>2'038,431</strong>.
-    That's an increase to <strong>240%</strong>!</p>
+    That's an increase to <strong>2.4 times</strong> the number of degrees in 1971!</p>
 <table class="center">
   <tr>
     <th>
-        <p>Number of degrees conferred</p>
+        <p>Total number of degrees conferred</p>
         <svg id="total_graph"></svg>
     </th>
   </tr>
@@ -61,14 +61,16 @@ circle {stroke: black;}
 </div>
 <br><br><br><br>
 </body>
+<footer>SOURCE: U.S. Department of Education, National Center for Education Statistics, Higher Education General Information Survey (HEGIS), "Degrees and Other Formal Awards Conferred" surveys, 1970-71 through 1985-86; Integrated Postsecondary Education Data System (IPEDS), "Completions Survey" (IPEDS-C:91-99); and IPEDS Fall 2000 through Fall 2020, Completions component. (The data was prepared September 2021.)</footer>
 <script>
 
-function getSvgWithMargins(id, width, height, margin) {
+function getSvgWithMargins(id, width, height, marginLeft) {
+    marginTop = marginLeft / 5;
     return d3.select(id)
-            .attr("width", width + 2*margin)
-            .attr("height", height + 2*margin)
+            .attr("width", width + 2*marginLeft)
+            .attr("height", height + marginTop)
         .append("g")
-            .attr("transform", "translate(" + margin + "," + margin + ")");
+            .attr("transform", "translate(" + marginLeft + "," + marginTop + ")");
 }
 
 function formatXAxis(svg, height, x, ticks) {

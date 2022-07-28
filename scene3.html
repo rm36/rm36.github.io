@@ -49,28 +49,40 @@ circle {stroke: black;}
 <table class="center">
   <tr>
     <th>
-        <p>Number of degrees conferred</p>
+        <p>Number of degrees for all majors</p>
         <svg id="stream_graph"></svg>
     </th>
     <th>
-        <p>Relative degrees conferred</p>
+        <p>Relative fraction</p>
         <svg id="stream_graph_fraction"></svg>
+    </th>
+  </tr>
+  <tr>
+    <th>
+        <p>Number of degrees</p>
+        <svg id="single_graph"></svg>
+    </th>
+    <th>
+        <p>Fraction relative to all degrees</p>
+        <svg id="single_graph_fraction"></svg>
     </th>
   </tr>
 </table>
 <div class="center">
-    <a href="scene1.html" class="previous">&laquo; Back to start</a>
+    <a href="scene2.html" class="previous">&laquo; Back</a>
 </div>
 <br><br><br><br>
 </body>
+<footer>SOURCE: U.S. Department of Education, National Center for Education Statistics, Higher Education General Information Survey (HEGIS), "Degrees and Other Formal Awards Conferred" surveys, 1970-71 through 1985-86; Integrated Postsecondary Education Data System (IPEDS), "Completions Survey" (IPEDS-C:91-99); and IPEDS Fall 2000 through Fall 2020, Completions component. (The data was prepared September 2021.)</footer>
 <script>
 
 function getSvgWithMargins(id, width, height, margin) {
+    marginTop = margin / 2.5;
     return d3.select(id)
             .attr("width", width + 2*margin)
-            .attr("height", height + 2*margin)
+            .attr("height", height + 2*marginTop)
         .append("g")
-            .attr("transform", "translate(" + margin + "," + margin + ")");
+            .attr("transform", "translate(" + margin + "," + marginTop + ")");
 }
 
 function formatXAxis(svg, height, x, ticks) {
@@ -120,6 +132,56 @@ function getFraction (data) {
     return fraction;
 }
 
+function getSums(data) {
+    let sums = [];
+    for (let i = 0; i < data.length; i++) {
+        let sum = 0;
+        for (let key in data[i]) {
+            if (key != 'Year') {
+                sum += parseInt(data[i][key]);
+            } else {
+                year = data[i][key];
+            }
+        }
+
+        sums.push({'Year': year, 'Value': sum});
+    }
+    return sums;
+}
+function getData(data) {
+    let allVals = {};
+    for (let i = 0; i < data.length; i++) {
+        let year = 0;
+        let vals = {};
+        for (let key in data[i]) {
+            if (key == 'Year') {
+                year = data[i][key];
+            } else {
+                vals[key] = parseInt(data[i][key]);
+            } 
+        }
+        for (let key in vals) {
+            if (!(key in allVals)) {
+                allVals[key] = [];
+            }
+            allVals[key].push({'Year': year, 'Value': vals[key]});
+        }
+    }
+    return allVals;
+}
+function getRelative(data, sums) {
+    let allRelative = {};
+    for (let key in data) {
+        for (let i = 0; i < data[key].length; i++) {
+            if (!(key in allRelative)) {
+                allRelative[key] = [];
+            }
+            allRelative[key].push({'Year': data[key][i].Year, 'Value': (data[key][i].Value/sums[i].Value)});
+        }
+    }
+    return allRelative;
+}
+
 function generateArea(x, y) {
     return d3.area()
     .x(function(d) { return x(d.data.Year); })
@@ -134,13 +196,20 @@ function getBounds(element) {
 async function init() {
     let margin = 30,
         width = 500 - 2*margin;
-        height = 400 - 2*margin;
+        height = 400 - 2*margin/3;
 
     let svg = getSvgWithMargins("#stream_graph", width, height, margin);
     let svgFraction = getSvgWithMargins("#stream_graph_fraction", width, height, margin);
 
+    let svgSingle = getSvgWithMargins("#single_graph", width, height, margin);
+    let svgSingleRelative = getSvgWithMargins("#single_graph_fraction", width, height, margin);
+
     data = await d3.csv("https://rm36.github.io/degrees_conferred.csv");
     let fraction = getFraction(data);
+
+    let sums = getSums(data),
+        singleData = getData(data),
+        singleDataRelative = getRelative(singleData, sums);
 
     // Get the header of the csv files
     let keys = data.columns.slice(1);
