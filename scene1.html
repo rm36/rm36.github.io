@@ -9,11 +9,15 @@
 <body onload='init()'>
 <h1>Are Americans getting more educated?</h1>
 <p>by <a href="mailto:rm36@illinois.edu">Rodrigo Mendoza</a></p>
+<div class="center">
 <p>
-    Each year, the number of bachelor degrees conferred in the USA has been increasing. This is not really a surprise, but did you know that the steepest increase was around <strong>2006</strong>?.</p>
-<p>
-    Another little-known fact is that in the last 30 years, this number has more than <strong>doubled</strong>. In 1971, the number of degrees conferred in the USA was <strong>839,730</strong>. In 2020, that number climbed to <strong>2'038,431</strong>.
-    That's an increase to <strong>2.4 times</strong> the number of degrees in 1971!</p>
+    Each year, the number of bachelor degrees conferred in the USA has been increasing.
+    <br>This is not really a surprise, but did you know that the steepest increase was around <strong>2006</strong>?.
+    <br>Another little-known fact is that in the last 30 years, this number has more than <strong>doubled</strong>.
+    <br>In 1971, the number of degrees conferred in the USA was <strong>839,730</strong>.In 2020: <strong>2'038,431</strong>.
+    <br>That's an increase to <strong>2.4 times</strong> the number of degrees in 1971!</p>
+</div>
+<br><br>
 <table class="center">
   <tr>
     <td>
@@ -68,8 +72,8 @@ async function init() {
     plotArea(svg, sums, getArea(xScale, yScale, height), "#046DAA");
 
     addHorizontalAxis(svg, {"x":width/2, "y": height-20}, "Year");
-    addLeftAxis(svg, {"x": -40, "y": height/2 - 130}, "Number of degrees (thousands)");
-    addRightAxis(svg, {"x": width + 40, "y": height/2 + 60}, "Percentage relative to 1971");
+    addLeftAxis(svg, {"x": -50, "y": height/2 - 130}, "Number of degrees (thousands)");
+    addRightAxis(svg, {"x": width + 50, "y": height/2 + 60}, "Percentage relative to 1971");
 
     const annotations = [
       {

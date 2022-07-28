@@ -54,7 +54,7 @@ function formatYAxis(svg, width, y, max = y.domain()[1]) {
         .call(d3.axisLeft(y)
             .tickSize(-width)
             .tickValues(values)
-            .tickFormat((d) => "" + (d)/1000 + "k"))
+            .tickFormat((d) => "" + (d)/1000 + "K"))
         .select(".domain").remove();
     svg.selectAll(".tick line").attr("stroke", "#bbbbbb");
 }
