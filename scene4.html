@@ -133,15 +133,15 @@ async function init() {
       {
         note: {
           label: "",
-          title: "",
+          title: "Try hovering here!",
           bgPadding: 0,
           align: "left",
           wrapSplitter: /\n/,
         },
-        x: 0,
-        y: 0,
+        x: 300,
+        y: 190,
         dy: 50,
-        dx: 50,
+        dx: -250,
         color: "#bb0000",
         connector: { end: "dot" },
         type: d3.annotationCalloutElbow,
@@ -278,7 +278,6 @@ async function init() {
     makeAnnotationsFraction = d3.annotation().annotations(annotations);
     svg.append("g").call(makeAnnotations);
     svgFraction.append("g").call(makeAnnotationsFraction);
-    d3.selectAll('.annotations').remove();
 
     // Add mouse over events on top of the annotation
     svg.selectAll("layerDataHover")
